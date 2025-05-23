@@ -258,7 +258,7 @@ def findClosestGroup(matrix,groups, current,resolution,originX,originY):
                 max_score = i
     if max_score != -1:
         targetP = paths[max_score]
-    else: #gruplar target_error*2 uzaklıktan daha yakınsa random bir noktayı hedef olarak seçer. Bu robotun bazı durumlardan kurtulmasını sağlar.
+    else: # target_error*2보다 가까우면 랜덤 지점을 목표로 선택
         index = random.randint(0,len(groups)-1)
         target = groups[index][1]
         target = target[random.randint(0,len(target)-1)]
@@ -291,19 +291,19 @@ def costmap(data,width,height,resolution):
     return data
 
 def exploration(data,width,height,resolution,column,row,originX,originY):
-        global pathGlobal #Global degisken
-        data = costmap(data,width,height,resolution) #Engelleri genislet
-        data[row][column] = 0 #Robot Anlık Konum
-        data[data > 5] = 1 # 0 olanlar gidilebilir yer, 100 olanlar kesin engel
-        data = frontierB(data) #Sınır noktaları bul
-        data,groups = assign_groups(data) #Sınır noktaları gruplandır
-        groups = fGroups(groups) #Grupları küçükten büyüğe sırala. En buyuk 5 grubu al
-        if len(groups) == 0: #Grup yoksa kesif tamamlandı
+        global pathGlobal # 전역 변수
+        data = costmap(data,width,height,resolution) # 장애물을 확장
+        data[row][column] = 0 # 로봇의 현재 위치
+        data[data > 5] = 1 # 0은 이동 가능한 영역이고, 100은 완전한 장애물이다.
+        data = frontierB(data) # 경계지점 탐색
+        data,groups = assign_groups(data) # 그룹화
+        groups = fGroups(groups) # 그룹을 크기 순으로 정렬 후 가장 큰 5개만 선택
+        if len(groups) == 0: # 그룹이 없으면 탐색 종료
             path = -1
-        else: #Grup varsa en yakın grubu bul
-            data[data < 0] = 1 #-0.05 olanlar bilinmeyen yer. Gidilemez olarak isaretle. 0 = gidilebilir, 1 = gidilemez.
-            path = findClosestGroup(data,groups,(row,column),resolution,originX,originY) #En yakın grubu bul
-            if path != None: #Yol varsa BSpline ile düzelt
+        else: # 그룹이 있다면 가장 가까운 그룹 찾기
+            data[data < 0] = 1 # -0,05는 미탐색 영역 > 이동 불가, 0: 이동 가능, 1: 이동 불가
+            path = findClosestGroup(data,groups,(row,column),resolution,originX,originY) # 가장 가까운 그룹 찾기
+            if path != None: # 경로 존재시 B-Spline 보간법 적용
                 path = bspline_planning(path,len(path)*5)
             else:
                 path = -1
@@ -334,13 +334,13 @@ class navigationControl(Node):
         self.subscription = self.create_subscription(Odometry,'odom',self.odom_callback,10)
         self.subscription = self.create_subscription(LaserScan,'scan',self.scan_callback,10)
         self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
-        print("[BILGI] KESİF MODU AKTİF")
+        print("[정보] 탐사 모드 활성화]")
         self.kesif = True
-        threading.Thread(target=self.exp).start() #Kesif fonksiyonunu thread olarak calistirir.
+        threading.Thread(target=self.exp).start() # 탐사 함수(exp)를 별도 스레드로 실행
         
     def exp(self):
         twist = Twist()
-        while True: #Sensor verileri gelene kadar bekle.
+        while True: # 센서 데이터 대기
             if not hasattr(self,'map_data') or not hasattr(self,'odom_data') or not hasattr(self,'scan_data'):
                 time.sleep(0.1)
                 continue
@@ -353,19 +353,19 @@ class navigationControl(Node):
                 else:
                     self.path = pathGlobal
                 if isinstance(self.path, int) and self.path == -1:
-                    print("[BILGI] KESİF TAMAMLANDI")
+                    print("[정보] 탐사 완료")
                     sys.exit()
                 self.c = int((self.path[-1][0] - self.originX)/self.resolution) 
                 self.r = int((self.path[-1][1] - self.originY)/self.resolution) 
                 self.kesif = False
                 self.i = 0
-                print("[BILGI] YENI HEDEF BELİRLENDI")
+                print("[정보] 새로운 목표 설정")
                 t = pathLength(self.path)/speed
-                t = t - 0.2 #x = v * t formülüne göre hesaplanan sureden 0.2 saniye cikarilir. t sure sonra kesif fonksiyonu calistirilir.
-                self.t = threading.Timer(t,self.target_callback) #Hedefe az bir sure kala kesif fonksiyonunu calistirir.
+                t = t - 0.2 # x = v * t 공식에 따라 계산된 시간에서 0.2초를 뺌. t초 뒤 탐사 함수 실행
+                self.t = threading.Timer(t,self.target_callback) # 목표 도착 전 탐사 함수 실행 타이머 설정
                 self.t.start()
             
-            #Rota Takip Blok Baslangic
+            # 경로 추종 블록 시작
             else:
                 v , w = localControl(self.scan)
                 if v == None:
@@ -374,13 +374,13 @@ class navigationControl(Node):
                     v = 0.0
                     w = 0.0
                     self.kesif = True
-                    print("[BILGI] HEDEFE ULASILDI")
-                    self.t.join() #Thread bitene kadar bekle.
+                    print("[정보] 목표 지점 도착")
+                    self.t.join() # 타이머 스레드 종료 대기
                 twist.linear.x = v
                 twist.angular.z = w
                 self.publisher.publish(twist)
                 time.sleep(0.1)
-            #Rota Takip Blok Bitis
+            # 경로 추종 블록 종료
 
     def target_callback(self):
         exploration(self.data,self.width,self.height,self.resolution,self.c,self.r,self.originX,self.originY)

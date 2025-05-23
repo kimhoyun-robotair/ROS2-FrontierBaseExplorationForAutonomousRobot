@@ -147,6 +147,7 @@ def pure_pursuit(current_x, current_y, current_heading, path, index):
         sign = 1 if desired_steering_angle > 0 else -1
         desired_steering_angle = sign * math.pi/4
         v = 0.0
+    desired_steering_angle = np.clip(desired_steering_angle, -0.2, 0.2)
     return v,desired_steering_angle,index
 
 def frontierB(matrix):
@@ -322,7 +323,7 @@ def localControl(scan):
         for i in range(300,360):
             if scan[i] < robot_r:
                 v = 0.2
-                w = math.pi/4
+                w = math.pi/12
                 break
     return v,w
 
@@ -396,7 +397,12 @@ class navigationControl(Node):
         self.originY = self.map_data.info.origin.position.y
         self.width = self.map_data.info.width
         self.height = self.map_data.info.height
-        self.data = self.map_data.data
+
+        data = np.array(self.map_data.data)
+        remapped = np.full(data.shape, -1, dtype=np.int8)
+        remapped[(data>=0) & (data<=70)] = 0
+        remapped[(data> 70) & (data<=100)] = 100
+        self.data = remapped.tolist()
 
     def odom_callback(self,msg):
         self.odom_data = msg

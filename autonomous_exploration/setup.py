@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'slamtoolbox_control = autonomous_exploration.slamtoolbox_control:main',
             'cartographer_control = autonomous_exploration.cartographer_control:main',
+            'rtabmap_control = autonomous_exploration.rtabmap_control:main',
         ],
     },
 )
