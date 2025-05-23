@@ -17,10 +17,11 @@ setup(
     maintainer_email='abd@todo.todo',
     description='TODO: Package description',
     license='TODO: License declaration',
-    tests_require=['pytest'],
+    #tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'control = autonomous_exploration.control:main'
+            'slamtoolbox_control = autonomous_exploration.slamtoolbox_control:main',
+            'cartographer_control = autonomous_exploration.cartographer_control:main',
         ],
     },
 )
